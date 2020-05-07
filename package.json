@@ -1,22 +1,15 @@
 {
-  "name": "@jaredreisinger/react-crossword",
-  "homepage": "http://JaredReisinger.github.io/react-crossword",
-  "version": "1.0.5",
-  "description": "A flexible, responsive, and easy-to-use crossword component for React apps",
+  "name": "@wilbertthelam/react-crossword",
+  "homepage": "https://github.com/wilbertthelam/react-crossword",
+  "version": "0.1.0",
+  "description": "A flexible, responsive, and easy-to-use crossword component for React apps forked from @jaredreisinger/react-crossword to provide state management",
   "author": {
-    "name": "JaredReisinger",
-    "email": "jaredreisinger@hotmail.com"
+    "name": "Wilbert Lam",
+    "email": "wilbertthelam@gmail.com"
   },
-  "keywords": [
-    "react",
-    "react-crossword",
-    "crossword",
-    "puzzle",
-    "library"
-  ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/JaredReisinger/react-crossword"
+    "url": "https://github.com/wilbertthelam/react-crossword.git"
   },
   "license": "MIT",
   "engines": {
@@ -139,5 +132,8 @@
     "react-dom": "16.x",
     "react": "16.x",
     "styled-components": "5.x"
+  },
+  "dependencies": {
+    "lodash": "^4.17.15"
   }
 }

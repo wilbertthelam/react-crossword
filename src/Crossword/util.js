@@ -126,9 +126,7 @@ export function serializeGuesses(gridData) {
   const guesses = gridData.reduce((memo, row, r) => {
     return row.reduce((memoInner, cellData, c) => {
       const { guess } = cellData;
-      if (guess !== '') {
-        memoInner[`${r}_${c}`] = cellData.guess;
-      }
+      memoInner[`${r}_${c}`] = guess;
       return memoInner;
     }, memo);
   }, {});
@@ -139,7 +137,9 @@ export function serializeGuesses(gridData) {
 export function deserializeGuesses(gridData, guesses) {
   Object.entries(guesses).forEach(([key, val]) => {
     const [r, c] = key.split('_');
-    gridData[r][c].guess = val;
+    if (gridData[r][c].guess !== val) {
+      gridData[r][c].guess = val;
+    }
   });
 }
 

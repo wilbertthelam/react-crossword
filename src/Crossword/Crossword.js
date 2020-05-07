@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import produce from 'immer';
 import styled from 'styled-components';
 
+import { cloneDeep } from 'lodash';
 import Cell from '../Cell/Cell';
 import {
   bothDirections,
@@ -94,7 +95,6 @@ class Crossword extends React.Component {
     this.handleClueClick = this.handleClueClick.bind(this);
     this.handleInputKeyDown = this.handleInputKeyDown.bind(this);
     this.handleInputChange = this.handleInputChange.bind(this);
-    // this.handleInput = this.handleInput.bind(this);
 
     this.svgRef = React.createRef();
     this.inputRef = React.createRef();
@@ -121,18 +121,60 @@ class Crossword extends React.Component {
       currentDirection: 'across',
 
       // special handler for bulk input change (copy/paste)
-      bulkChange: null,
+      // bulkChange: null,
     };
   }
 
   componentDidUpdate(prevProps, prevState) {
-    let { bulkChange } = this.state;
-    const { data } = this.props;
+    // let { bulkChange } = this.state;
+
+    // guessState comes in via the server sending a new guess state
+    const { data, guessState } = this.props;
+
+    // Trigger state update if there is a new guessState incoming from the server
+    if (
+      JSON.stringify(JSON.parse(guessState).guesses) !==
+      JSON.stringify(JSON.parse(prevProps.guessState).guesses)
+    ) {
+      const { gridData } = this.state;
+      const newGridData = cloneDeep(gridData);
+
+      this.loadGuesses(newGridData);
+
+      if (
+        newGridData &&
+        JSON.stringify(newGridData) !== JSON.stringify(prevState.gridData)
+      ) {
+        this.saveGuesses(newGridData, true);
+      }
+
+      // eslint-disable-next-line react/no-did-update-set-state
+      this.setState({
+        gridData: newGridData,
+      });
+      return;
+    }
+
+    // Entered when this user types in a new character
+    const { gridData } = this.state;
+    if (
+      gridData &&
+      JSON.stringify(gridData) !== JSON.stringify(prevState.gridData)
+    ) {
+      this.saveGuesses(gridData, false);
+      return;
+    }
+
+    // Initialization case for first load
     if (data !== prevProps.data) {
       const { size, gridData: newGridData, clues } = createGridData(data);
-      this.loadGuesses(gridData);
+      this.loadGuesses(newGridData);
 
-      bulkChange = null;
+      if (newGridData && newGridData !== prevState.gridData) {
+        this.saveGuesses(newGridData, false);
+      }
+
+      // bulkChange = null;
       // eslint-disable-next-line react/no-did-update-set-state
       this.setState({
         size,
@@ -150,26 +192,21 @@ class Crossword extends React.Component {
         focusedCol: 0,
         highlight: '1',
 
-        bulkChange,
+        // bulkChange,
       });
     }
 
     // handle bulkChange by updating a character at a time (this lets us
     // leverage the existing character-entry logic).
-    if (bulkChange) {
-      this.handleSingleCharacter(bulkChange[0]);
-      bulkChange = bulkChange.substring(1);
-      if (bulkChange.length === 0) {
-        bulkChange = null;
-      }
-      // eslint-disable-next-line react/no-did-update-set-state
-      this.setState({ bulkChange });
-    }
-
-    const { gridData } = this.state;
-    if (gridData && gridData !== prevState.gridData) {
-      this.saveGuesses();
-    }
+    // if (bulkChange) {
+    //   this.handleSingleCharacter(bulkChange[0]);
+    //   bulkChange = bulkChange.substring(1);
+    //   if (bulkChange.length === 0) {
+    //     bulkChange = null;
+    //   }
+    //   // eslint-disable-next-line react/no-did-update-set-state
+    //   this.setState({ bulkChange });
+    // }
   }
 
   clearGuesses() {
@@ -181,13 +218,12 @@ class Crossword extends React.Component {
   }
 
   // Take the guesses from data, generate the save state, and persist.
-  saveGuesses() {
+  saveGuesses(gridData, isServerUpdate) {
     const { localStorage } = window;
     if (!localStorage) {
       return;
     }
 
-    const { gridData } = this.state;
     const guesses = serializeGuesses(gridData);
 
     const saveData = {
@@ -195,22 +231,36 @@ class Crossword extends React.Component {
       guesses,
     };
 
+    // Handle prop callback
+    // Only send response to server if it is coming from this client,
+    // not another user sending their update
+    const { onLetterUpdate } = this.props;
+    if (!isServerUpdate && onLetterUpdate) {
+      onLetterUpdate(saveData);
+      return;
+    }
+
     localStorage.setItem(this.storageKey, JSON.stringify(saveData));
   }
 
   loadGuesses(gridData) {
     const { data, useStorage, onLoadedCorrect } = this.props;
-    const { localStorage } = window;
-    if (!useStorage || !localStorage) {
-      return;
+    let saveData;
+    if (!useStorage) {
+      const { guessState } = this.props;
+      if (!guessState) {
+        return;
+      }
+      saveData = JSON.parse(guessState);
+    } else {
+      const { localStorage } = window;
+      const saveRaw = localStorage.getItem(this.storageKey);
+      if (!saveRaw) {
+        return;
+      }
+      saveData = JSON.parse(saveRaw);
     }
 
-    const saveRaw = localStorage.getItem(this.storageKey);
-    if (!saveRaw) {
-      return;
-    }
-
-    const saveData = JSON.parse(saveRaw);
     // TODO: check date for expiration?
     deserializeGuesses(gridData, saveData.guesses);
 
@@ -560,8 +610,7 @@ class Crossword extends React.Component {
 
   handleInputChange(event) {
     event.preventDefault();
-    // console.log('INPUT CHANGE!', event.target.value);
-    this.setState({ bulkChange: event.target.value });
+    console.log('INPUT CHANGE!', event.target.value, this);
   }
 
   /**
@@ -835,6 +884,12 @@ Crossword.propTypes = {
   onCorrect: PropTypes.func,
   /** callback function that's called when a crossword is loaded, to batch up correct answers loaded from storage; passed an array of the same values that `onCorrect` would recieve */
   onLoadedCorrect: PropTypes.func,
+
+  /** callback function that fires when the user types a letter */
+  onLetterUpdate: PropTypes.func,
+
+  /** state representing the current guesses */
+  guessState: PropTypes.string,
 };
 
 Crossword.defaultProps = {
@@ -849,6 +904,8 @@ Crossword.defaultProps = {
   useStorage: true,
   onCorrect: null,
   onLoadedCorrect: null,
+  onLetterUpdate: null,
+  guessState: '',
 };
 
 export default Crossword;
